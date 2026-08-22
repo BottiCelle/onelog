@@ -14,26 +14,44 @@ onelog.py — 统一日志配置模块
 调用方式见文件底部示例
 """
 
-import logging
-import sys
 import atexit
+import logging
+import os
+import sys
+from typing import Any, Dict, List, NoReturn, Optional, TypedDict, Union
+
 from rich.logging import RichHandler
 from rich.traceback import install
 
-__version__ = "0.1.1"
+__all__ = ["FATAL", "FatalError", "__version__", "get_logger", "log_summary"]
+__version__ = "0.1.2"
 
 # 全局安装 Rich traceback
 install(show_locals=True)
 
+
+class _Config(TypedDict):
+    level: Union[int, str]
+    show_loc: bool
+    show_time: bool
+    show_summary: bool
+    gen_log: bool
+    log_file: Optional[str]
+    log_format: str
+    date_format: str
+
+
 # 默认配置
-_DEFAULT_CONFIG = {
+_DEFAULT_CONFIG: _Config = {
     "level": logging.INFO,
     "show_loc": False,
     "show_time": True,
     "show_summary": True,
     "gen_log": True,
     "log_file": "app.log",
-    "log_format": "%(asctime)s | %(levelname)-8s | %(pathname)s:%(lineno)d | %(message)s",
+    "log_format": (
+        "%(asctime)s | %(levelname)-8s | %(pathname)s:%(lineno)d | %(message)s"
+    ),
     "date_format": "[%H:%M:%S]",
 }
 
@@ -43,14 +61,16 @@ FATAL = logging.FATAL  # 50，比 CRITICAL 高
 
 class FatalError(Exception):
     """FATAL 日志触发的异常"""
+
     pass
 
+
 # 全局配置（首次 get_logger 调用后锁定）
-_global_config = None
-_configured = False
+_global_config: Optional[_Config] = None
+_configured: bool = False
 
 # 日志计数器
-_log_counter = {
+_log_counter: Dict[str, int] = {
     "DEBUG": 0,
     "INFO": 0,
     "WARNING": 0,
@@ -61,17 +81,19 @@ _log_counter = {
 
 class _CountingFilter(logging.Filter):
     """过滤器：统计各级别日志数量"""
-    def filter(self, record):
+
+    def filter(self, record: logging.LogRecord) -> bool:
         level_name = record.levelname
         if level_name in _log_counter:
             _log_counter[level_name] += 1
         return True
 
 
-def log_summary():
+def log_summary() -> None:
     """打印日志统计摘要"""
     from rich.console import Console
     from rich.rule import Rule
+
     console = Console()
     console.print()
     console.print(Rule("[bold]📊 Log Summary[/bold]", style="cyan"))
@@ -79,25 +101,25 @@ def log_summary():
     console.print(f"  INFO:    {_log_counter['INFO']}")
     console.print(f"  WARNING: {_log_counter['WARNING']}", style="yellow")
     console.print(f"  ERROR:   {_log_counter['ERROR']}", style="bold red")
-    if _log_counter['FATAL'] > 0:
+    if _log_counter["FATAL"] > 0:
         console.print(f"  FATAL:   {_log_counter['FATAL']}", style="bold magenta")
     console.print()
-    if _global_config and _global_config.get("log_file"):
-        import os
-        log_path = os.path.abspath(_global_config["log_file"])
+    config = _global_config
+    if config is not None and config["log_file"] is not None:
+        log_path = os.path.abspath(config["log_file"])
         console.print(f"  Log File: {log_path}")
     console.print(Rule(style="cyan"))
     console.print()
 
 
 def get_logger(
-    name: str = None,
-    level: int = None,
-    show_loc: bool = None,
-    show_time: bool = None,
-    show_summary: bool = None,
-    gen_log: bool = None,
-    log_file: str = None,
+    name: Optional[str] = None,
+    level: Optional[Union[int, str]] = None,
+    show_loc: Optional[bool] = None,
+    show_time: Optional[bool] = None,
+    show_summary: Optional[bool] = None,
+    gen_log: Optional[bool] = None,
+    log_file: Optional[str] = None,
 ) -> logging.Logger:
     """
     获取 logger 实例。
@@ -121,7 +143,7 @@ def get_logger(
 
     if not _configured:
         # 首次调用：用传入参数（或默认值）完成全局配置
-        _global_config = dict(_DEFAULT_CONFIG)
+        _global_config = _DEFAULT_CONFIG.copy()
         if level is not None:
             _global_config["level"] = level
         if show_loc is not None:
@@ -143,54 +165,58 @@ def get_logger(
     return logging.getLogger(name)
 
 
-def _apply_config():
+def _apply_config() -> None:
     """应用当前 _global_config 到 root logger"""
+    config = _global_config
+    if config is None:
+        raise RuntimeError("onelog configuration has not been initialized")
+
     root = logging.getLogger()
     root.handlers.clear()
-    root.setLevel(_global_config["level"])
+    root.setLevel(config["level"])
 
     # RichHandler — 终端彩色输出
     from rich.console import Console
     from rich.theme import Theme
 
     # 自定义主题：FATAL 用紫色
-    custom_theme = Theme({
-        "logging.level.warning": "yellow",
-        "logging.level.error": "bold red",
-        "logging.level.fatal": "bold magenta",
-    })
+    custom_theme = Theme(
+        {
+            "logging.level.warning": "yellow",
+            "logging.level.error": "bold red",
+            "logging.level.fatal": "bold magenta",
+        }
+    )
     console = Console(theme=custom_theme)
 
     rich_handler = RichHandler(
         console=console,
         rich_tracebacks=True,
-        show_path=_global_config["show_loc"],
+        show_path=config["show_loc"],
         show_level=True,
-        show_time=_global_config["show_time"],
-        log_time_format=_global_config["date_format"],
+        show_time=config["show_time"],
+        log_time_format=config["date_format"],
         markup=False,
     )
-    rich_handler.setLevel(_global_config["level"])
+    rich_handler.setLevel(config["level"])
     rich_handler.addFilter(_CountingFilter())
 
-    handlers = [rich_handler]
+    handlers: List[logging.Handler] = [rich_handler]
 
     # FileHandler — 文件记录
-    if _global_config["log_file"]:
-        file_handler = logging.FileHandler(
-            _global_config["log_file"], encoding="utf-8"
-        )
+    if config["log_file"] is not None:
+        file_handler = logging.FileHandler(config["log_file"], encoding="utf-8")
         file_handler.setFormatter(
             logging.Formatter(
-                _global_config["log_format"],
-                datefmt=_global_config["date_format"],
+                config["log_format"],
+                datefmt=config["date_format"],
             )
         )
-        file_handler.setLevel(_global_config["level"])
+        file_handler.setLevel(config["level"])
         handlers.append(file_handler)
 
     logging.basicConfig(
-        level=_global_config["level"],
+        level=config["level"],
         format="%(message)s",
         handlers=handlers,
         force=True,
@@ -200,19 +226,22 @@ def _apply_config():
     _patch_logger_fatal()
 
     # 注册退出时自动打印 summary（根据配置决定）
-    if _global_config["show_summary"]:
+    if config["show_summary"]:
         atexit.register(log_summary)
 
 
-def _patch_logger_fatal():
+def _patch_logger_fatal() -> None:
     """给所有 Logger 实例添加 fatal() 方法：打印日志后 sys.exit(1)"""
-    def fatal(self, msg, *args, **kwargs):
+
+    def fatal(
+        self: logging.Logger, msg: object, *args: object, **kwargs: Any
+    ) -> NoReturn:
         # stacklevel=2 让行号指向调用者而非这里
         kwargs.setdefault("stacklevel", 2)
         self.log(FATAL, msg, *args, **kwargs)
         sys.exit(1)
 
-    logging.Logger.fatal = fatal
+    setattr(logging.Logger, "fatal", fatal)
     logging.addLevelName(FATAL, "FATAL")
 
 
@@ -220,9 +249,9 @@ def _patch_logger_fatal():
 # 示例
 # ============================================================
 if __name__ == "__main__":
-    from onelog import get_logger
-
-    log = get_logger(__name__, level=logging.DEBUG, show_loc=True, show_time=True, log_file="app.log")
+    log = get_logger(
+        __name__, level=logging.DEBUG, show_loc=True, show_time=True, log_file="app.log"
+    )
 
     log.debug("调试信息")
     log.info("处理完成")

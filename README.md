@@ -25,10 +25,10 @@ python3 -m pip install onelogg
 也可以直接从 GitHub 安装已标记的版本：
 
 ```bash
-python3 -m pip install "git+https://github.com/BottiCelle/onelog.git@v0.1.1"
+python3 -m pip install "git+https://github.com/BottiCelle/onelog.git@v0.1.2"
 ```
 
-当前包版本为 `0.1.1`，发行名为 `onelogg`，导入名保持为
+当前包版本为 `0.1.2`，发行名为 `onelogg`，导入名保持为
 `onelog`。
 
 ## 使用方法
@@ -37,7 +37,7 @@ python3 -m pip install "git+https://github.com/BottiCelle/onelog.git@v0.1.1"
 from onelog import get_logger
 
 # 顶层模块配置（第一个调用 get_logger 的决定全局配置）
-log = get_logger(__name__, level="DEBUG", show_path=True, log_file="app.log")
+log = get_logger(__name__, level="DEBUG", show_loc=True, log_file="app.log")
 
 log.debug("调试信息")
 log.info("正常信息")
@@ -58,6 +58,18 @@ def find_data(query):
     log.debug(f"搜索: {query}")
     return []
 ```
+
+可运行的完整版本见 [`examples/multi/`](examples/multi/)：
+
+```bash
+python examples/multi/main.py
+```
+
+## 类型检查
+
+`onelogg` 0.1.2 起按照 PEP 561 发布 inline types。Pyright、mypy 等类型检查器
+安装 wheel 后会自动识别 `onelog` 的类型，不再需要项目内维护额外的 `.pyi`
+文件。
 
 ## 日志统计
 

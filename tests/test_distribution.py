@@ -6,7 +6,7 @@ from zipfile import ZipFile
 
 
 def test_wheel_uses_onelogg_distribution_identity(tmp_path: Path) -> None:
-    project_root = Path(__file__).parent
+    project_root = Path(__file__).parents[1]
     completed = subprocess.run(
         [
             sys.executable,
@@ -25,7 +25,7 @@ def test_wheel_uses_onelogg_distribution_identity(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    wheel = next(tmp_path.glob("onelogg-0.1.1-*.whl"))
+    wheel = next(tmp_path.glob("onelogg-0.1.2-*.whl"))
     with ZipFile(wheel) as archive:
         names = archive.namelist()
         metadata_path = next(
@@ -34,9 +34,11 @@ def test_wheel_uses_onelogg_distribution_identity(tmp_path: Path) -> None:
         metadata = BytesParser().parsebytes(archive.read(metadata_path))
 
     assert metadata["Name"] == "onelogg"
-    assert metadata["Version"] == "0.1.1"
+    assert metadata["Version"] == "0.1.2"
     assert metadata["Author"] == "BottiCelle"
-    assert "onelog.py" in names
+    assert "onelog/__init__.py" in names
+    assert "onelog/py.typed" in names
+    assert "onelog.py" not in names
     assert set(metadata.get_all("Project-URL")) == {
         "Homepage, https://github.com/BottiCelle/onelog",
         "Repository, https://github.com/BottiCelle/onelog",

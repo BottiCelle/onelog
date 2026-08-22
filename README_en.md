@@ -25,10 +25,10 @@ python3 -m pip install onelogg
 You can also install a tagged release directly from GitHub:
 
 ```bash
-python3 -m pip install "git+https://github.com/BottiCelle/onelog.git@v0.1.1"
+python3 -m pip install "git+https://github.com/BottiCelle/onelog.git@v0.1.2"
 ```
 
-The current package version is `0.1.1`. Its distribution name is
+The current package version is `0.1.2`. Its distribution name is
 `onelogg`, while its import name remains `onelog`.
 
 ## Usage
@@ -36,7 +36,7 @@ The current package version is `0.1.1`. Its distribution name is
 ```python
 from onelog import get_logger
 
-log = get_logger(__name__, level="DEBUG", show_path=True, log_file="app.log")
+log = get_logger(__name__, level="DEBUG", show_loc=True, log_file="app.log")
 
 log.debug("debug message")
 log.info("info message")
@@ -44,6 +44,19 @@ log.warning("warning message")
 log.error("error message")
 log.fatal("fatal error, script exits here")
 ```
+
+See [`examples/multi/`](examples/multi/) for the complete runnable multi-module
+example:
+
+```bash
+python examples/multi/main.py
+```
+
+## Type checking
+
+Starting with `onelogg` 0.1.2, the wheel ships PEP 561 inline types. Type
+checkers such as Pyright and mypy discover the `onelog` types automatically,
+so consumers no longer need to maintain a local `.pyi` file.
 
 Log summary prints automatically when the script exits:
 

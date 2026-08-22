@@ -27,6 +27,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -v
 
+      - name: Check public and internal types
+        run: npx --yes pyright@1.1.411 --project pyrightconfig.json
+
       - name: Build wheel and source distribution
         run: python -m build
 
